@@ -8,6 +8,7 @@ __author__ = "Luc Anselin <luc.anselin@asu.edu> Serge Rey <sjsrey@gmail.com>"
 import numpy as np
 from libpysal.weights.spatial_lag import lag_spatial
 from .tabular import _univariate_handler
+import warnings
 
 __all__ = ['Gamma']
 
@@ -157,7 +158,11 @@ class Gamma(object):
 
 
     """
-    def __init__(self, y, w, operation='c', standardize='no', permutations=PERMUTATIONS):
+    def __init__(self, y, w, operation='c', standardize=False, permutations=PERMUTATIONS):
+        if isinstance(standardize, str):
+            standardize = standardize.lower() == 'yes'
+            warnings.warn('Use True/False for standardize. The option to'
+                          ' provide "yes"/"no" will be deprecated in PySAL 2.2.' )
         y = np.asarray(y).flatten()
         self.w = w
         self.y = y
