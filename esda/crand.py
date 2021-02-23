@@ -447,14 +447,21 @@ def parallel_crand(
         (N, max_cardinality) array with local statistics simulated under
         the null of spatial randomness
     """
-    from joblib import Parallel, delayed, parallel_backend
+    from joblib import Parallel, delayed, parallel_backend, dump, load
     from tempfile import mkdtemp
     import os.path as path
+    import shutil
 
     tmpdir = mkdtmp()
 
     ##
     # write all the big arrays out, so that the only thing shipped around is i
+    dump(z, path.join(tmpdir, "z.mm"))
+    z = load(path.join(tmpdir, "z.mm"), mmap_mode="r")
+    dump(permuted_ids, path.join(tmpdir, "permuted_ids.mm"))
+    permuted_ids = load(path.join(tmpdir, "permuted_ids.mm"), mmap_mode="r")
+    dump(weights, path.join(tmpdir, "weights.mm"))
+    weights = load(path.join(tmpdir, "weights.mm"), mmap_mode="r")
 
     n = z.shape[0]
     # w_boundary_points = build_weights_offsets(cardinalities, n_jobs)
@@ -495,9 +502,12 @@ def parallel_crand(
             )
             for i in range(n)
         )
-    larger, rlocals = zip(*worker_out)
+    larger, rlocals = zip(*result)
     larger = np.hstack(larger).flatten()
     rlocals = np.row_stack(rlocals)
+
+    shutil.rmtree(tmpdir)
+
     return larger, rlocals
 
 
