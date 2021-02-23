@@ -103,7 +103,7 @@ def crand(
             scaling : float
                 Scaling value to apply to every local statistic
      seed : None/int
-        Seed to ensure reproducibility of conditional randomizations               
+        Seed to ensure reproducibility of conditional randomizations
 
     Returns
     -------
@@ -212,14 +212,14 @@ def compute_chunk(
     ---------
     chunk_start : int
         Starting index for the chunk of input. Should be zero if z_chunk == z.
-    z_chunk : numpy.ndarray 
+    z_chunk : numpy.ndarray
         (n_chunk,) array containing the chunk of standardised observed values.
     z : ndarray
         2D array with N rows with standardised observed values
     observed : ndarray
         (n_chunk,) array containing observed values for the chunk
     cardinalities : ndarray
-        (n_chunk,) array containing the cardinalities for each element. 
+        (n_chunk,) array containing the cardinalities for each element.
     weights : ndarray
         Array containing the weights within the chunk in a flat format (ie. as
         obtained from the `values` attribute of a CSR sparse representation of
@@ -264,7 +264,9 @@ def compute_chunk(
         ]
         rstats = stat_func(chunk_start + i, z, permuted_ids, weights_i, scaling)
         if keep:
-            rlocals[i,] = rstats
+            rlocals[
+                i,
+            ] = rstats
         larger[i] = np.sum(rstats >= observed[i])
     return larger, rlocals
 
@@ -284,7 +286,7 @@ def build_weights_offsets(cardinalities: np.ndarray, n_chunks: int):
     Parameters
     ----------
     cardinalities : ndarray
-        (n_chunk,) array containing the cardinalities for each element. 
+        (n_chunk,) array containing the cardinalities for each element.
     n_chunks : int
         Number of chunks to split the weights into
 
@@ -331,7 +333,7 @@ def chunk_generator(
     observed : ndarray
         (N,) array with observed values
     cardinalities : ndarray
-        (N,) array containing the cardinalities for each element. 
+        (N,) array containing the cardinalities for each element.
     weights : ndarray
         Array containing the weights within the chunk in a flat format (ie. as
         obtained from the `values` attribute of a CSR sparse representation of
@@ -344,14 +346,14 @@ def chunk_generator(
     ------
     start : int
         Starting index for the chunk of input. Should be zero if z_chunk == z.
-    z_chunk : numpy.ndarray 
+    z_chunk : numpy.ndarray
         (n_chunk,) array containing the chunk of standardised observed values.
     z : ndarray
         2D array with N rows with standardised observed values
     observed_chunk : ndarray
         (n_chunk,) array containing observed values for the chunk
     cardinalities_chunk : ndarray
-        (n_chunk,) array containing the cardinalities for each element. 
+        (n_chunk,) array containing the cardinalities for each element.
     weights_chunk : ndarray
         Array containing the weights within the chunk in a flat format (ie. as
         obtained from the `values` attribute of a CSR sparse representation of
@@ -396,7 +398,7 @@ def parallel_crand(
     observed : ndarray
         (N,) array with observed values
     cardinalities : ndarray
-        (N,) array containing the cardinalities for each element. 
+        (N,) array containing the cardinalities for each element.
     weights : ndarray
         Array containing the weights in a flat format (ie. as
         obtained from the `values` attribute of a CSR sparse representation of
@@ -439,9 +441,9 @@ def parallel_crand(
     from joblib import Parallel, delayed, parallel_backend
 
     n = z.shape[0]
-    w_boundary_points = build_weights_offsets(cardinalities, n_jobs)
-    chunk_size = n // n_jobs + 1
-    starts = np.arange(n_jobs + 1) * chunk_size
+    # w_boundary_points = build_weights_offsets(cardinalities, n_jobs)
+    # chunk_size = n // n_jobs + 1
+    # starts = np.arange(n_jobs + 1) * chunk_size
     # ------------------------------------------------------------------
     # Set up output holders
     larger = np.zeros((n,), dtype=np.int64)
@@ -453,14 +455,20 @@ def parallel_crand(
     # Joblib parallel loop by chunks
 
     # construct chunks using a generator
-    chunks = chunk_generator(
-        n_jobs, starts, z, observed, cardinalities, weights, w_boundary_points,
-    )
+    # chunks = chunk_generator(
+    #    n_jobs, starts, z, observed, cardinalities, weights, w_boundary_points,
+    # )
 
-    with parallel_backend("loky", inner_max_num_threads=1):
-        worker_out = Parallel(n_jobs=n_jobs)(
-            delayed(compute_chunk)(*pars, permuted_ids, scaling, keep, stat_func)
-            for pars in chunks
+    steps = np.cumsum(cardinalities)
+    stops = steps[1:]
+    starts = steps[:-1]
+
+    with parallel_backend("loky", n_jobs=n_jobs):
+        engine = Parallel()
+        promise = delayed(stat_func)
+        result = engine(
+            promise(i, z, permuted_ids, weights[starts[i] : stops[i]], scaling)
+            for i in range(n)
         )
     larger, rlocals = zip(*worker_out)
     larger = np.hstack(larger).flatten()
