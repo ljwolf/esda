@@ -271,6 +271,15 @@ def compute_chunk(
     return larger, rlocals
 
 
+@njit(parallel=False, fastmath=True)
+def compute_one(stat_func, i, z, observed, weights_i, permuted_ids, scaling, keep):
+    rstats = stat_func(i, z, permuted_ids, weights_i, scaling)
+    if not keep:
+        rstats = numpy.empty((1, 1))
+    larger = np.sum(rstats >= observed)
+    return larger, rstats
+
+
 #######################################################################
 #                   Parallel Implementation                           #
 #######################################################################
@@ -439,6 +448,13 @@ def parallel_crand(
         the null of spatial randomness
     """
     from joblib import Parallel, delayed, parallel_backend
+    from tempfile import mkdtemp
+    import os.path as path
+
+    tmpdir = mkdtmp()
+
+    ##
+    # write all the big arrays out, so that the only thing shipped around is i
 
     n = z.shape[0]
     # w_boundary_points = build_weights_offsets(cardinalities, n_jobs)
@@ -465,9 +481,18 @@ def parallel_crand(
 
     with parallel_backend("loky", n_jobs=n_jobs):
         engine = Parallel()
-        promise = delayed(stat_func)
+        promise = delayed(compute_one)
         result = engine(
-            promise(i, z, permuted_ids, weights[starts[i] : stops[i]], scaling)
+            promise(
+                stat_func,
+                i,
+                z,
+                observed[i],
+                weights[starts[i] : stops[i]],
+                permuted_ids,
+                scaling,
+                keep,
+            )
             for i in range(n)
         )
     larger, rlocals = zip(*worker_out)
