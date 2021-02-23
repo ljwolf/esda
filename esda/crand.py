@@ -274,9 +274,9 @@ def compute_chunk(
 @njit(parallel=False, fastmath=True)
 def compute_one(stat_func, i, z, observed, weights_i, permuted_ids, scaling, keep):
     rstats = stat_func(i, z, permuted_ids, weights_i, scaling)
+    larger = np.sum(rstats >= observed)
     if not keep:
         rstats = numpy.empty((1, 1))
-    larger = np.sum(rstats >= observed)
     return larger, rstats
 
 
