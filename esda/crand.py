@@ -465,8 +465,8 @@ def parallel_crand(
         w_boundary_points,
     )
 
-    with parallel_backend("loky", max_nbytes=1):
-        worker_out = Parallel(n_jobs=n_jobs)(
+    with parallel_backend("loky"):
+        worker_out = Parallel(n_jobs=n_jobs, max_nbytes=1)(
             delayed(compute_chunk)(*pars, permuted_ids, scaling, keep, stat_func)
             for pars in chunks
         )
