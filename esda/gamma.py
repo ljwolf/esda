@@ -13,13 +13,13 @@ from libpysal.weights.spatial_lag import lag_spatial
 from .crand import _prepare_univariate
 from .crand import njit as _njit
 from .tabular import _univariate_handler
-
+from .significance import calculate_significance
 __all__ = ["Gamma"]
 
 PERMUTATIONS = 999
 
 
-class Gamma(object):
+class Gamma:
     """Gamma index for spatial autocorrelation
 
 
@@ -42,6 +42,14 @@ class Gamma(object):
                       True, standardize to mean zero and variance one
     permutations    : int
                       number of random permutations for calculation of pseudo-p_values
+    alternative : str (default: "two-sided")
+        The form of the alternative hypothesis to adopt when calculating
+        simulated p-values. The options are:
+        1. 'two-sided': the p-value reflects the fraction of statistics from conditional permutation that are at least as far into the tail as the random replicate, as measured by the replicate's percentile. 
+        2. 'greater': the p-value reflects the fraction of statistics from conditional permutation that are greater than the test statistic.
+        3. 'lesser': the p-value reflects the fraction of statistics from
+        conditional permutation that are smaller than the test statistic.
+        4. 'directed': the p-value is chosen as the smaller value of either 'greater' or 'lesser' alternatives (not recommended). 
 
     Attributes
     ----------
@@ -164,7 +172,7 @@ class Gamma(object):
     """
 
     def __init__(
-        self, y, w, operation="c", standardize=False, permutations=PERMUTATIONS
+        self, y, w, operation="c", standardize=False, permutations=PERMUTATIONS, alternative='two-sided'
     ):
         if isinstance(standardize, str):
             standardize = standardize.lower() == "yes"
@@ -190,22 +198,19 @@ class Gamma(object):
                 self.__calc(np.random.permutation(self.y), self.op)
                 for i in range(permutations)
             ]
+            
             self.sim_g = np.array(sim)
+            self.p_sim = calculate_significance(self.g, self.sim_g, alternative=alternative)
             self.min_g = np.min(self.sim_g)
             self.mean_g = np.mean(self.sim_g)
             self.max_g = np.max(self.sim_g)
-            p_sim_g = self.__pseudop(self.sim_g, self.g)
-            self.p_sim_g = p_sim_g
             self.g_z = (self.g - self.mean_g) / np.std(self.sim_g)
+        else:
+            self._reference_distribution = None
 
     @property
     def _statistic(self):
         return self.g
-
-    @property
-    def p_sim(self):
-        """new name to fit with Moran module"""
-        return self.p_sim_g
 
     def __calc(self, z, op):
         if op == "c":  # cross-product

@@ -70,7 +70,6 @@ def calculate_significance(test_stat, reference_distribution, method="two-sided"
         )
     return p_value
 
-
 if __name__ == "__main__":
     import numpy
     import esda

@@ -21,6 +21,7 @@ class Join_Counts_Local_MV(BaseEstimator):
         seed=None,
         island_weight=0,
         drop_islands=True,
+        alternative='two-sided'
     ):
         """
         Initialize a Local_Join_Counts_MV estimator
@@ -62,6 +63,7 @@ class Join_Counts_Local_MV(BaseEstimator):
         self.seed = seed
         self.island_weight = island_weight
         self.drop_islands = drop_islands
+        self.alternative = alternative
 
     def fit(self, variables, n_jobs=1, permutations=999):
         """
@@ -134,6 +136,7 @@ class Join_Counts_Local_MV(BaseEstimator):
                 n_jobs=n_jobs,
                 stat_func=_ljc_mv,
                 island_weight=self.island_weight,
+                alternative=self.alternative
             )
             # Set p-values for those with LJC of 0 to NaN
             self.p_sim[self.LJC == 0] = "NaN"

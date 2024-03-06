@@ -4,12 +4,13 @@ import libpysal as lp
 import numpy as np
 from scipy import stats
 from sklearn.base import BaseEstimator
+from .significance import calculate_significance
 
 
 class LOSH(BaseEstimator):
     """Local spatial heteroscedasticity (LOSH)"""
 
-    def __init__(self, connectivity=None, inference=None):
+    def __init__(self, connectivity=None):
         """
         Initialize a losh estimator
 

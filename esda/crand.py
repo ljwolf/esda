@@ -72,6 +72,7 @@ def crand(
     keep,
     n_jobs,
     stat_func,
+    alternative="two-sided",
     scaling=None,
     seed=None,
     island_weight=0,
@@ -218,11 +219,21 @@ def crand(
             stat_func,
             island_weight,
         )
-
-    low_extreme = (permutations - larger) < larger
-    larger[low_extreme] = permutations - larger[low_extreme]
-    p_sim = (larger + 1.0) / (permutations + 1.0)
-
+    if alternative in ("greater", "lesser"):
+        p_sim = (larger + 1.0) / (permutations + 1.0)
+        if alternative == "lesser":
+            p_sim = 1 - p_sim
+    elif alternative in ("two-sided", "directed"):
+        low_extreme = (permutations - larger) < larger
+        larger[low_extreme] = permutations - larger[low_extreme]
+        p_sim = (larger + 1.0) / (permutations + 1.0)
+        if alternative == "two-sided":
+            p_sim = p_sim*2 - (1/(permutations + 1))
+    else:
+        raise ValueError(
+            f"alternative option '{alternative}' must be"
+            f"one of ('greater','lesser','two-sided','directed')"
+             )
     return p_sim, rlocals
 
 

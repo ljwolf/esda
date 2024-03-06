@@ -5,12 +5,13 @@ from sklearn.base import BaseEstimator
 
 from .crand import _prepare_bivariate
 from .crand import njit as _njit
+from .significance import calculate_significance
 
 
 class Spatial_Pearson(BaseEstimator):
     """Global Spatial Pearson Statistic"""
 
-    def __init__(self, connectivity=None, permutations=999):
+    def __init__(self, connectivity=None, permutations=999, alternative='two-sided'):
         """
         Initialize a spatial pearson estimator
 
@@ -40,6 +41,7 @@ class Spatial_Pearson(BaseEstimator):
         """
         self.connectivity = connectivity
         self.permutations = permutations
+        self.alternative = alternative
 
     def fit(self, x, y):
         """
@@ -86,10 +88,7 @@ class Spatial_Pearson(BaseEstimator):
                 for _ in range(self.permutations)
             ]
             self.reference_distribution_ = simulations = numpy.array(simulations)
-            above = simulations >= self.association_
-            larger = above.sum(axis=0)
-            extreme = numpy.minimum(self.permutations - larger, larger)
-            self.significance_ = (extreme + 1.0) / (self.permutations + 1.0)
+            self.significance_ = calculate_significance(self.association_, self.reference_distribution_, alternative=self.alternative)
         return self
 
     @staticmethod

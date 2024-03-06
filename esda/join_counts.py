@@ -31,7 +31,14 @@ class Join_Counts(object):
                       spatial weights instance
     permutations    : int
                       number of random permutations for calculation of pseudo-p_values
-
+    alternative : str (default: "two-sided")
+        The form of the alternative hypothesis to adopt when calculating
+        simulated p-values. The options are:
+        1. 'two-sided': the p-value reflects the fraction of statistics from conditional permutation that are at least as far into the tail as the random replicate, as measured by the replicate's percentile. 
+        2. 'greater': the p-value reflects the fraction of statistics from conditional permutation that are greater than the test statistic.
+        3. 'lesser': the p-value reflects the fraction of statistics from
+        conditional permutation that are smaller than the test statistic.
+        4. 'directed': the p-value is chosen as the smaller value of either 'greater' or 'lesser' alternatives (not recommended). 
     Attributes
     ----------
     y            : array

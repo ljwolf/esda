@@ -10,7 +10,7 @@ import scipy.stats as stats
 from libpysal import weights
 
 from .tabular import _univariate_handler
-
+from .significance import calculate_significance
 __all__ = ["Geary"]
 
 
@@ -32,7 +32,14 @@ class Geary(object):
     permutations   : int
                      number of random permutations for calculation of
                      pseudo-p_values
-
+    alternative : str (default: "two-sided")
+        The form of the alternative hypothesis to adopt when calculating
+        simulated p-values. The options are:
+        1. 'two-sided': the p-value reflects the fraction of statistics from conditional permutation that are at least as far into the tail as the random replicate, as measured by the replicate's percentile. 
+        2. 'greater': the p-value reflects the fraction of statistics from conditional permutation that are greater than the test statistic.
+        3. 'lesser': the p-value reflects the fraction of statistics from
+        conditional permutation that are smaller than the test statistic.
+        4. 'directed': the p-value is chosen as the smaller value of either 'greater' or 'lesser' alternatives (not recommended). 
     Attributes
     ----------
     y              : array
@@ -102,7 +109,7 @@ class Geary(object):
 
     """
 
-    def __init__(self, y, w, transformation="r", permutations=999):
+    def __init__(self, y, w, transformation="r", permutations=999, alternative='two-sided'):
         if not isinstance(w, weights.W):
             raise TypeError(
                 f"w must be a pysal weights object, got {type(w)} instead."
@@ -140,11 +147,7 @@ class Geary(object):
                 self.__calc(np.random.permutation(self.y)) for i in range(permutations)
             ]
             self.sim = sim = np.array(sim)
-            above = sim >= self.C
-            larger = sum(above)
-            if (permutations - larger) < larger:
-                larger = permutations - larger
-            self.p_sim = (larger + 1.0) / (permutations + 1.0)
+            self.p_sim = calculate_significance(self.C, sim, alternative=self.alternative)
             self.EC_sim = sum(sim) / permutations
             self.seC_sim = np.array(sim).std()
             self.VC_sim = self.seC_sim**2

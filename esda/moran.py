@@ -22,7 +22,7 @@ from .crand import crand as _crand_plus
 from .crand import njit as _njit
 from .smoothing import assuncao_rate
 from .tabular import _bivariate_handler, _univariate_handler
-
+from .significance import calculate_significance
 __all__ = [
     "Moran",
     "Moran_Local",
@@ -185,11 +185,7 @@ class Moran:
                 self.__calc(np.random.permutation(self.z)) for i in range(permutations)
             ]
             self.sim = sim = np.array(sim)
-            above = sim >= self.I
-            larger = above.sum()
-            if (self.permutations - larger) < larger:
-                larger = self.permutations - larger
-            self.p_sim = (larger + 1.0) / (permutations + 1.0)
+            self.p_sim = calculate_significance(self.I, self.sim, alternative="two-sided" if two_tailed else "directed")
             self.EI_sim = sim.sum() / permutations
             self.seI_sim = np.array(sim).std()
             self.VI_sim = self.seI_sim**2
@@ -316,6 +312,14 @@ class Moran_BV:
     permutations    : int
                       number of random permutations for calculation of pseudo
                       p_values
+    alternative : str (default: "two-sided")
+        The form of the alternative hypothesis to adopt when calculating
+        simulated p-values. The options are:
+        1. 'two-sided': the p-value reflects the fraction of statistics from conditional permutation that are at least as far into the tail as the random replicate, as measured by the replicate's percentile. 
+        2. 'greater': the p-value reflects the fraction of statistics from conditional permutation that are greater than the test statistic.
+        3. 'lesser': the p-value reflects the fraction of statistics from
+        conditional permutation that are smaller than the test statistic.
+        4. 'directed': the p-value is chosen as the smaller value of either 'greater' or 'lesser' alternatives (not recommended). 
 
     Attributes
     ----------
@@ -399,7 +403,7 @@ class Moran_BV:
 
     """
 
-    def __init__(self, x, y, w, transformation="r", permutations=PERMUTATIONS):
+    def __init__(self, x, y, w, transformation="r", permutations=PERMUTATIONS, alternative='two-sided'):
         x = np.asarray(x).flatten()
         y = np.asarray(y).flatten()
         zy = (y - y.mean()) / y.std(ddof=1)
@@ -417,11 +421,7 @@ class Moran_BV:
             nrp = np.random.permutation
             sim = [self.__calc(nrp(zy)) for i in range(permutations)]
             self.sim = sim = np.array(sim)
-            above = sim >= self.I
-            larger = above.sum()
-            if (permutations - larger) < larger:
-                larger = permutations - larger
-            self.p_sim = (larger + 1.0) / (permutations + 1.0)
+            self.p_sim = calculate_significance(self.I, sim, alternative=alternative)
             self.EI_sim = sim.sum() / permutations
             self.seI_sim = np.array(sim).std()
             self.VI_sim = self.seI_sim**2
@@ -599,8 +599,8 @@ def _Moran_BV_Matrix_array(variables, w, permutations=0, varnames=None):
         for j in range(i + 1, k):
             y1 = variables[i]
             y2 = variables[j]
-            results[i, j] = Moran_BV(y1, y2, w, permutations=permutations)
-            results[j, i] = Moran_BV(y2, y1, w, permutations=permutations)
+            results[i, j] = Moran_BV(y1, y2, w, permutations=permutations, alternative='two-sided')
+            results[j, i] = Moran_BV(y2, y1, w, permutations=permutations, alternative='two-sided')
             results[i, j].varnames = {"x": varnames[i], "y": varnames[j]}
             results[j, i].varnames = {"x": varnames[j], "y": varnames[i]}
     return results
@@ -892,7 +892,15 @@ class Moran_Local:
         value to use as a weight for the "fake" neighbor for every island.
         If numpy.nan, will propagate to the final local statistic depending
         on the `stat_func`. If 0, then the lag is always zero for islands.
-
+    alternative : str (default: "two-sided")
+        The form of the alternative hypothesis to adopt when calculating
+        simulated p-values. The options are:
+        1. 'two-sided': the p-value reflects the fraction of statistics from conditional permutation that are at least as far into the tail as the random replicate, as measured by the replicate's percentile. 
+        2. 'greater': the p-value reflects the fraction of statistics from conditional permutation that are greater than the test statistic.
+        3. 'lesser': the p-value reflects the fraction of statistics from
+        conditional permutation that are smaller than the test statistic.
+        4. 'directed': the p-value is chosen as the smaller value of either 'greater' or 'lesser' alternatives (not recommended). 
+        
     Attributes
     ----------
 
@@ -1009,6 +1017,7 @@ class Moran_Local:
         keep_simulations=True,
         seed=None,
         island_weight=0,
+        alternative='two-sided'
     ):
         y = np.asarray(y).flatten()
         self.y = y
@@ -1045,16 +1054,11 @@ class Moran_Local:
                 n_jobs=n_jobs,
                 stat_func=_moran_local_crand,
                 seed=seed,
+                alternative=alternative
             )
             self.sim = np.transpose(self.rlisas)
             if keep_simulations:
-                sim = np.transpose(self.rlisas)
-                above = sim >= self.Is
-                larger = above.sum(0)
-                low_extreme = (self.permutations - larger) < larger
-                larger[low_extreme] = self.permutations - larger[low_extreme]
-                self.p_sim = (larger + 1.0) / (permutations + 1.0)
-                self.sim = sim
+                self.sim = self.rlisas
                 self.EI_sim = self.sim.mean(axis=0)
                 self.seI_sim = self.sim.std(axis=0)
                 self.VI_sim = self.seI_sim * self.seI_sim
@@ -1267,6 +1271,14 @@ class Moran_Local_BV:
         value to use as a weight for the "fake" neighbor for every island.
         If numpy.nan, will propagate to the final local statistic depending
         on the `stat_func`. If 0, then the lag is always zero for islands.
+    alternative : str (default: "two-sided")
+        The form of the alternative hypothesis to adopt when calculating
+        simulated p-values. The options are:
+        1. 'two-sided': the p-value reflects the fraction of statistics from conditional permutation that are at least as far into the tail as the random replicate, as measured by the replicate's percentile. 
+        2. 'greater': the p-value reflects the fraction of statistics from conditional permutation that are greater than the test statistic.
+        3. 'lesser': the p-value reflects the fraction of statistics from
+        conditional permutation that are smaller than the test statistic.
+        4. 'directed': the p-value is chosen as the smaller value of either 'greater' or 'lesser' alternatives (not recommended). 
 
     Attributes
     ----------
@@ -1347,6 +1359,7 @@ class Moran_Local_BV:
         keep_simulations=True,
         seed=None,
         island_weight=0,
+        alternative='two-sided'
     ):
         x = np.asarray(x).flatten()
         y = np.asarray(y).flatten()
@@ -1389,16 +1402,10 @@ class Moran_Local_BV:
                 n_jobs=n_jobs,
                 stat_func=_moran_local_bv_crand,
                 seed=seed,
+                alternative=alternative
             )
             self.sim = np.transpose(self.rlisas)
             if keep_simulations:
-                sim = np.transpose(self.rlisas)
-                above = sim >= self.Is
-                larger = above.sum(0)
-                low_extreme = (self.permutations - larger) < larger
-                larger[low_extreme] = self.permutations - larger[low_extreme]
-                self.p_sim = (larger + 1.0) / (permutations + 1.0)
-                self.sim = sim
                 self.EI_sim = sim.mean(axis=0)
                 self.seI_sim = sim.std(axis=0)
                 self.VI_sim = self.seI_sim * self.seI_sim
@@ -1619,6 +1626,7 @@ class Moran_Local_Rate(Moran_Local):
         keep_simulations=True,
         seed=None,
         island_weight=0,
+        alternative='two-sided'
     ):
         e = np.asarray(e).flatten()
         b = np.asarray(b).flatten()
@@ -1636,6 +1644,7 @@ class Moran_Local_Rate(Moran_Local):
             n_jobs=n_jobs,
             keep_simulations=keep_simulations,
             seed=seed,
+            alternative=alternative
         )
 
     @classmethod

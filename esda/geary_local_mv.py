@@ -3,13 +3,13 @@ import pandas as pd
 from scipy import stats
 from sklearn.base import BaseEstimator
 from sklearn.utils import check_array
-
+from .significance import calculate_significance
 
 class Geary_Local_MV(BaseEstimator):
 
     """Local Geary - Multivariate"""
 
-    def __init__(self, connectivity=None, permutations=999, drop_islands=True):
+    def __init__(self, connectivity=None, permutations=999, drop_islands=True, alternative='two-sided'):
         """
         Initialize a Local_Geary_MV estimator
 
@@ -28,6 +28,14 @@ class Geary_Local_MV(BaseEstimator):
             list. By default, observations with no neighbors do not appear
             in the adjacency list. If islands are kept, they are coded as
             self-neighbors with zero weight. See ``libpysal.weights.to_adjlist()``.
+        alternative : str (default: "two-sided")
+            The form of the alternative hypothesis to adopt when calculating
+            simulated p-values. The options are:
+            1. 'two-sided': the p-value reflects the fraction of statistics from conditional permutation that are at least as far into the tail as the random replicate, as measured by the replicate's percentile. 
+            2. 'greater': the p-value reflects the fraction of statistics from conditional permutation that are greater than the test statistic.
+            3. 'lesser': the p-value reflects the fraction of statistics from
+            conditional permutation that are smaller than the test statistic.
+            4. 'directed': the p-value is chosen as the smaller value of either 'greater' or 'lesser' alternatives (not recommended). 
 
         Attributes
         ----------
@@ -42,6 +50,7 @@ class Geary_Local_MV(BaseEstimator):
         self.connectivity = connectivity
         self.permutations = permutations
         self.drop_islands = drop_islands
+        self.alternative = alternative
 
     def fit(self, variables):
         """
@@ -102,11 +111,7 @@ class Geary_Local_MV(BaseEstimator):
         if permutations:
             self._crand(zvariables)
             sim = np.transpose(self.Gs)
-            above = sim >= self.localG
-            larger = above.sum(0)
-            low_extreme = (permutations - larger) < larger
-            larger[low_extreme] = permutations - larger[low_extreme]
-            self.p_sim = (larger + 1.0) / (permutations + 1.0)
+            self.p_sim = calculate_significance(self.localG, sims, alternative=self.alternative)
 
         return self
 

@@ -16,11 +16,12 @@ from .crand import _prepare_univariate
 from .crand import crand as _crand_plus
 from .crand import njit as _njit
 from .tabular import _univariate_handler
+from .significance import calculate_significance
 
 PERMUTATIONS = 999
 
 
-class G(object):
+class G(Permtest_Mixin):
     """
     Global G Autocorrelation Statistic
 
@@ -32,7 +33,14 @@ class G(object):
                    DistanceBand W spatial weights based on distance band
     permutations  : int
                     the number of random permutations for calculating pseudo p_values
-
+    alternative : str (default: "two-sided")
+        The form of the alternative hypothesis to adopt when calculating
+        simulated p-values. The options are:
+        1. 'two-sided': the p-value reflects the fraction of statistics from conditional permutation that are at least as far into the tail as the random replicate, as measured by the replicate's percentile. 
+        2. 'greater': the p-value reflects the fraction of statistics from conditional permutation that are greater than the test statistic.
+        3. 'lesser': the p-value reflects the fraction of statistics from
+        conditional permutation that are smaller than the test statistic.
+        4. 'directed': the p-value is chosen as the smaller value of either 'greater' or 'lesser' alternatives (not recommended). 
     Attributes
     ----------
     y : array
@@ -111,7 +119,7 @@ class G(object):
 
     """
 
-    def __init__(self, y, w, permutations=PERMUTATIONS):
+    def __init__(self, y, w, permutations=PERMUTATIONS, alternative="two-sided"):
         y = np.asarray(y).flatten()
         self.n = len(y)
         self.y = y
@@ -132,12 +140,8 @@ class G(object):
             sim = [
                 self.__calc(np.random.permutation(self.y)) for i in range(permutations)
             ]
-            self.sim = sim = np.array(sim)
-            above = sim >= self.G
-            larger = sum(above)
-            if (self.permutations - larger) < larger:
-                larger = self.permutations - larger
-            self.p_sim = (larger + 1.0) / (permutations + 1.0)
+            self.sim = self._reference_distribution = sim = np.array(sim)
+            self.p_sim = calculate_significance(self.G, self.sim, alternative=alternative)
             self.EG_sim = sum(sim) / permutations
             self.seG_sim = sim.std()
             self.VG_sim = self.seG_sim**2
@@ -240,7 +244,7 @@ class G(object):
         )
 
 
-class G_Local(object):
+class G_Local(Permtest_Mixin):
     """
     Generalized Local G Autocorrelation
 
@@ -410,6 +414,7 @@ class G_Local(object):
         n_jobs=-1,
         seed=None,
         island_weight=0,
+        alternative="two-sided"
     ):
         y = np.asarray(y).flatten()
         self.n = len(y)
@@ -434,6 +439,7 @@ class G_Local(object):
                 scaling=y.sum(),
                 seed=seed,
                 island_weight=island_weight,
+                alternative=alternative
             )
             if keep_simulations:
                 self.sim = sim = self.rGs.T
@@ -442,38 +448,6 @@ class G_Local(object):
                 self.VG_sim = self.seG_sim * self.seG_sim
                 self.z_sim = (self.Gs - self.EG_sim) / self.seG_sim
                 self.p_z_sim = stats.norm.sf(np.abs(self.z_sim))
-
-    def __crand(self, keep_simulations):
-        y = self.y
-        if keep_simulations:
-            rGs = np.zeros((self.n, self.permutations))
-        larger = np.zeros((self.n,))
-        n_1 = self.n - 1
-        rid = list(range(n_1))
-        prange = list(range(self.permutations))
-        k = self.w.max_neighbors + 1
-        rids = np.array([np.random.permutation(rid)[0:k] for i in prange])
-        ids = np.arange(self.w.n)
-        wc = self.__getCardinalities()
-        if self.w_transform == "r":
-            den = np.array(wc) + self.star
-        else:
-            den = np.ones(self.w.n)
-        for i in range(self.w.n):
-            idsi = ids[ids != i]
-            np.random.shuffle(idsi)
-            yi_star = y[i] * self.star
-            wci = wc[i]
-            rGs_i = (y[idsi[rids[:, 0:wci]]]).sum(1) + yi_star
-            rGs_i = (np.array(rGs_i) / den[i]) / (self.y_sum - (1 - self.star) * y[i])
-            if keep_simulations:
-                rGs[i] = rGs_i
-            larger[i] = (rGs_i >= self.Gs[i]).sum()
-        if keep_simulations:
-            self.rGs = rGs
-        below = (self.permutations - larger) < larger
-        larger[below] = self.permutations - larger[below]
-        self.p_sim = (larger + 1) / (self.permutations + 1)
 
     def __getCardinalities(self):
         ido = self.w.id_order

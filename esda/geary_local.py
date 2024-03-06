@@ -2,10 +2,9 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
 
-from esda.crand import _prepare_univariate
-from esda.crand import crand as _crand_plus
-from esda.crand import njit as _njit
-
+from .crand import _prepare_univariate
+from .crand import crand as _crand_plus
+from .crand import njit as _njit
 
 class Geary_Local(BaseEstimator):
 
@@ -22,6 +21,7 @@ class Geary_Local(BaseEstimator):
         seed=None,
         island_weight=0,
         drop_islands=True,
+        alternative='two-sided'
     ):
         """
         Initialize a Local_Geary estimator
@@ -72,6 +72,14 @@ class Geary_Local(BaseEstimator):
             list. By default, observations with no neighbors do not appear
             in the adjacency list. If islands are kept, they are coded as
             self-neighbors with zero weight. See ``libpysal.weights.to_adjlist()``.
+        alternative : str (default: "two-sided")
+            The form of the alternative hypothesis to adopt when calculating
+            simulated p-values. The options are:
+            1. 'two-sided': the p-value reflects the fraction of statistics from conditional permutation that are at least as far into the tail as the random replicate, as measured by the replicate's percentile. 
+            2. 'greater': the p-value reflects the fraction of statistics from conditional permutation that are greater than the test statistic.
+            3. 'lesser': the p-value reflects the fraction of statistics from
+            conditional permutation that are smaller than the test statistic.
+            4. 'directed': the p-value is chosen as the smaller value of either 'greater' or 'lesser' alternatives (not recommended). 
 
         Attributes
         ----------
@@ -94,6 +102,7 @@ class Geary_Local(BaseEstimator):
         self.seed = seed
         self.island_weight = island_weight
         self.drop_islands = drop_islands
+        self.alternative = alternative
 
     def fit(self, x):
         """
@@ -145,6 +154,7 @@ class Geary_Local(BaseEstimator):
                 n_jobs=n_jobs,
                 stat_func=_local_geary,
                 island_weight=self.island_weight,
+                alternative=self.alternative
             )
 
         if self.labels:
